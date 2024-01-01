@@ -5,5 +5,7 @@ Molto spesso le percezioni sul rischio di viaggiare e vivere in alcuni Stati est
 In questo progetto verranno analizzati dati provenienti da varie fonti, tra cui il Dipartimento di Stato USA, cercando di capire quali siano effettivamente le nazioni più pericolose e quelle meno pericolose. 
 Oltre a questa informazione andrò a scoprire la presenza di eventuali ulteriori insights, ad esempio i paesi maggiormente segnalati o le varie cause di morte.
 
+Per eseguire le query ho utilizzato il workspace presente nel sito al link seguente.
+
 ### Data source
 https://data.world/travelwarnings/travel-danger
