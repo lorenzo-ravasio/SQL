@@ -1,0 +1,76 @@
+-- verifico l'origine del dato percap. Utilizzo il rapporto n_morti/n_viaggiatori
+-- uso la funzione ROUND con parametro 2 per indicare quanti decimali voglio ottenere
+-- ordino in senso decrescente al fine di una migliore leggibilità del set di risultati
+select ROUND(((ndeaths/ntravelers)*100000),2) as rate, percap
+from deathspercapita_1
+order by percap desc;
+
+
+-- conoscendo il significato della colonna percap ordino in senso decrescente
+-- e limito con la clausola LIMIT ai primi 3 risultati
+select * from deathspercapita_1
+order by percap desc
+LIMIT 3;
+
+
+-- con la where filtro alle nazioni per cui il rapporto è praticamente nullo
+-- per stabilire che gerarchia dare, essendoci più risultati con la condizione posta, ordino in senso decrescente per numero di viaggiatori
+-- e limito con la clausola LIMIT ai primi 3 risultati
+select * from deathspercapita_1
+where percap = '0.0'
+order by ntravelers desc
+LIMIT 3;
+
+
+
+-- ipotizzo come spiegato nella presentazione che la pericolosità sia definita dal rapporto morti/avvertimenti
+-- usata INNER JOIN per ricavare i due dati usati per il rapporto, usata di nuovo la funzione ROUND
+-- posta nella where, condizione che consente di evitare i casi con 0 avvertimenti e n morti che darebbero un valore non valido al campo rate
+select d.country, sdwarnings_df_region, freq as n_deaths, sdwarnings_df_nwarnings as n_warnings, ROUND((freq/sdwarnings_df_nwarnings),1) as rate
+from deathsranking_csv d 
+join warningsranking w 
+on d.country = w.sdwarnings_df_country
+where sdwarnings_df_nwarnings > 0
+order by (freq/sdwarnings_df_nwarnings) desc
+
+
+-- verifico quali nazioni segnalate dagli enti preposti non avuto abbiano alcun morto
+-- usata la clausola NOT IN per escludere il set di risultati della subquery, ovvero ogni singola nazione indicata univocamente, grazie alla clausola distinct
+-- posta condizione (>10) per ridurre il set di risultati.
+SELECT * from warningsranking
+where sdwarnings_df_country not in (select distinct country from deathsranking_csv)
+and sdwarnings_df_nwarnings > 10
+
+
+-- questa query va ad identificare la causa di morte più frequente per ogni nazione. I casi ex aequo vengono riportati tutti. Utilizzata una CTE (riconoscibile dalla clausola WITH) per consentire un primo raggruppamento e poi lavorarci su di esso. Nella CTE ho usato il COUNT(1) e non COUNT(*) per rendere la query più efficiente.
+-- Nella seconda parte, nella subquery utilizzata le cosiddetta windowing function, dunque RANK() con OVER e PARTITION BY per raggruppare in sottoset il set di risultati cosicchè poi si possa dare il "rank".
+-- la condizione ranking = 1 vuole ottenere la prima o le prime righe, in caso di parità, per ogni sottoset di risultati.
+WITH cte_cause_morte AS (
+    SELECT country, cause_of_death, COUNT(1) AS frequenza 
+    FROM sdamerican_deaths_abroad_10_09_to_06_16
+    GROUP BY country, cause_of_death
+)
+SELECT country, cause_of_death, frequenza
+FROM (
+    SELECT country, cause_of_death, frequenza, RANK() OVER (PARTITION BY country ORDER BY frequenza DESC) AS ranking 
+    FROM cte_cause_morte
+) ranked_data
+WHERE ranking = 1
+order by country desc
+
+
+-- con una CTE creo tabella che conta occorrenze per coppia country-cause_of_death. Nella seconda parte metto in join la CTE con la tabella countriesregions per associare ad ogni nazione il rispettivo
+continente. Nella seconda parte escludo con la clausola NOT LIKE il set di risultati aventi nella stringa di cause_of_death la sottostringa 'ccid' al fine di evitare le cause di natura incidentale. 
+with cte_cause_morte as (
+        select country, cause_of_death, count(1) as frequenza
+        from sdamerican_deaths_abroad_10_09_to_06_16
+        group by country, cause_of_death
+        )
+select cr.region, cause_of_death, SUM(frequenza) as somma
+from cte_cause_morte c 
+join countriesregions cr 
+on c.country = cr.name
+where cause_of_death not like '%ccid%'
+group by region, cause_of_death
+order by region, somma desc
+
